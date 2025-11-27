@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Parking Machine Assistant",
+    "slug": "parking-machine-assistant",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.parkingmachineassistant",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
+    },
+    "plugins": [
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e006c737-0d38-4b09-acdd-2905740aecd4"
+      }
+    },
+    "owner": "mohamedbouraoui"
+  }
+}

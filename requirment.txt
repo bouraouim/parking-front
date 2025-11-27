@@ -1,0 +1,133 @@
+React Native Android App Requirements (Parking Payment Machine Assistant)
+
+A React Native app (Android only) to help parking workers maintain parking payment machines.
+
+1. Authentication
+
+    - Support user login with username and password.
+
+    - Keep the user logged in (persistent session).
+
+    - If the user is already logged in, bypass login screen.
+
+2. Firebase Cloud Messaging (FCM) Integration
+
+    - Obtain FCM token on app install.
+
+    - after login send the FCM token to the backend server.
+
+    - Handle token refresh and re-send it to backend.
+
+
+3. Notifications & Missions
+General
+
+    - Each notification received via FCM represents a mission that the worker must execute.
+
+    - Ask for notification permission on first install.
+
+    - If notification permission is disabled, show a CTA prompting the user to enable notifications.
+
+    - The app must be able to receive background and foreground FCM push notifications.
+
+    - Clicking on a notification should open the app and navigate to the corresponding mission.
+
+Notification Payload Structure
+{
+    "id" : "string",          // mission id
+  "date": "string",
+  "cashier": "string",          // cashier name
+  "machineName": "string",
+
+  "collect": {                  // money to collect from the machine
+    "noteAmount": 0,            // int
+    "coinAmount": 0.0           // float
+  },
+
+  "refill": {                   // money to deposit into the machine
+    "coins": {
+      "amount": 0.0,
+      "coinTypes": {            // dynamic keys
+        "type": 0.0
+      }
+    },
+    "notes": {
+      "amount": 0.0,
+      "noteTypes": {            // dynamic keys
+        "type": 0.0
+      }
+    }
+  },
+
+  "maintenance": [
+    // list of predefined actions
+  ],
+
+  "qrCode": "string",           // mission request ID
+
+}
+
+4. Mission List Screen
+
+    - fetch missions the first time 
+
+    - add refresh pull to refetch
+
+    - sort by date , unopened first 
+
+    - Save missions locally in local storage.
+
+    - After login, display the mission list.
+
+    - Highlight or color-code unopened missions.
+
+    - Show each mission’s status: in progress/completed
+
+    - Clicking a mission opens its detailed mission screen showing the full payload.
+
+5. Mission Interface (Mission Details Screen)
+
+    -A mission behaves like a to-do list with multiple task groups (collect, refill, maintenance…).
+
+    -When a mission is opened for the first time, update its status to in progress locally.
+
+    - fetch mission when opened from server
+
+    -Each task has a checkbox / toggle.
+
+    -The mission has a Submit button.
+
+Submit Mission Behavior
+
+When the user presses Submit:
+
+    - not all task have to be validated 
+
+    - If all valid, mark mission status as completed locally.
+
+    - Send a request to the backend server to update the mission’s status (e.g., /mission/{id}/update).
+
+Handle server success/error:
+
+    - On success → keep mission as completed.
+
+    - On failure → show error message and keep mission as “in progress” until retried.
+
+QR Code
+    - generate code from the payload
+
+    - Mission includes a Show QR Code button.
+
+    - Clicking it displays the QR code and increases screen brightness to maximum for easy scanning.
+
+    - Reset brightness to original when QR view is closed.
+
+6 Server URL Configuration
+
+    - When the app is first opened, prompt the user to enter the server URL.
+
+    - Store the server URL securely in local storage (e.g., AsyncStorage or encrypted storage).
+
+    - All API requests, including login, FCM token registration, and mission updates, should use this stored server URL.
+
+    -  validate the URL to ensure it is reachable before proceeding.
