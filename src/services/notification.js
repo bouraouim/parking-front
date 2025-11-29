@@ -7,12 +7,27 @@ import { storageService } from './storage';
 
 // Configure notification handler
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldVibrate: true,
-  }),
+  handleNotification: async () => {
+    // Check if user is logged in
+    const user = await apiService.getUserData();
+    
+    if (!user) {
+      // Don't show notification if user is not logged in
+      return {
+        shouldShowAlert: false,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+        shouldVibrate: false,
+      };
+    }
+    
+    return {
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldVibrate: true,
+    };
+  },
 });
 
 class NotificationService {
@@ -162,42 +177,6 @@ class NotificationService {
     }
   }
 
-  // Schedule local notification (for testing)
-  async scheduleTestNotification() {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Test Mission",
-        body: 'Machine: Test Machine - Cashier: Test User',
-        data: { 
-          id: 'test-mission-001',
-          payload: JSON.stringify({
-            id: 'test-mission-001',
-            date: new Date().toISOString().split('T')[0],
-            cashier: 'Test User',
-            machineName: 'Test Machine',
-            collect: { noteAmount: 100, coinAmount: 50 },
-            refill: { 
-              coins: { amount: 50, coinTypes: { '1': 25, '2': 25 } },
-              notes: { amount: 200, noteTypes: { '10': 10, '20': 10 } }
-            },
-            maintenance: ['Clean screen'],
-            qrCode: 'TEST123'
-          })
-        },
-      },
-      trigger: { seconds: 2 },
-    });
-  }
-
-  // Cleanup listeners
-  removeListeners() {
-    if (this.notificationListener) {
-      Notifications.removeNotificationSubscription(this.notificationListener);
-    }
-    if (this.responseListener) {
-      Notifications.removeNotificationSubscription(this.responseListener);
-    }
-  }
 }
 
 export default new NotificationService();

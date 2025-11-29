@@ -1,12 +1,21 @@
-import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiService from './api';
 
-const MISSIONS_STORAGE_KEY = 'missions';
+const MISSIONS_STORAGE_KEY_PREFIX = 'missions_';
 
 export const storageService = {
+  // Get storage key for current user
+  async getUserStorageKey() {
+    const user = await apiService.getUserData();
+    const userId = user?.id || user?.username || 'default';
+    return `${MISSIONS_STORAGE_KEY_PREFIX}${userId}`;
+  },
+
   // Save missions to local storage
   async saveMissions(missions) {
     try {
-      await SecureStore.setItemAsync(MISSIONS_STORAGE_KEY, JSON.stringify(missions));
+      const key = await this.getUserStorageKey();
+      await AsyncStorage.setItem(key, JSON.stringify(missions));
       return true;
     } catch (error) {
       console.error('Failed to save missions:', error);
@@ -17,7 +26,8 @@ export const storageService = {
   // Get missions from local storage
   async getMissions() {
     try {
-      const data = await SecureStore.getItemAsync(MISSIONS_STORAGE_KEY);
+      const key = await this.getUserStorageKey();
+      const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : [];
     } catch (error) {
       console.error('Failed to get missions:', error);
@@ -54,10 +64,11 @@ export const storageService = {
     }
   },
 
-  // Clear all missions
+  // Clear all missions for current user
   async clearMissions() {
     try {
-      await SecureStore.deleteItemAsync(MISSIONS_STORAGE_KEY);
+      const key = await this.getUserStorageKey();
+      await AsyncStorage.removeItem(key);
       return true;
     } catch (error) {
       console.error('Failed to clear missions:', error);
