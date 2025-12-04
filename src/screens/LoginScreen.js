@@ -11,6 +11,8 @@ import {
   Platform,
 } from 'react-native';
 import {useAuth} from '../context/AuthContext';
+import {useLanguage} from '../context/LanguageContext';
+import {getTranslation} from '../i18n/translations';
 import notificationService from '../services/notification';
 
 const LoginScreen = ({navigation}) => {
@@ -18,10 +20,13 @@ const LoginScreen = ({navigation}) => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const {login} = useAuth();
+  const {language} = useLanguage();
+  
+  const t = (key) => getTranslation(language, key);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter username and password');
+      Alert.alert(t('error'), t('usernameRequired') + ' & ' + t('passwordRequired'));
       return;
     }
 
@@ -35,10 +40,10 @@ const LoginScreen = ({navigation}) => {
         await notificationService.registerToken();
         navigation.replace('MissionList');
       } else {
-        Alert.alert('Login Failed', result.error || 'Invalid credentials');
+        Alert.alert(t('login'), result.error || t('invalidServerUrl'));
       }
     } catch (error) {
-      Alert.alert('Error', 'An error occurred during login');
+      Alert.alert(t('error'), t('errorOccurred'));
     } finally {
       setIsLoading(false);
     }
@@ -50,13 +55,13 @@ const LoginScreen = ({navigation}) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.content}>
         <Text style={styles.title}>Parking Machine Assistant</Text>
-        <Text style={styles.subtitle}>Login to continue</Text>
+        <Text style={styles.subtitle}>{t('login')}</Text>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Username</Text>
+          <Text style={styles.label}>{t('username')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter username"
+            placeholder={t('usernamePlaceholder')}
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
@@ -64,10 +69,10 @@ const LoginScreen = ({navigation}) => {
             editable={!isLoading}
           />
 
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t('password')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Enter password"
+            placeholder={t('passwordPlaceholder')}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -83,7 +88,7 @@ const LoginScreen = ({navigation}) => {
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Login</Text>
+              <Text style={styles.buttonText}>{t('login')}</Text>
             )}
           </TouchableOpacity>
         </View>

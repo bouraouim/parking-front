@@ -76,21 +76,4 @@ export const storageService = {
     }
   },
 
-  // Sort missions: unopened first, then by date
-  sortMissions(missions) {
-    return [...missions].sort((a, b) => {
-      // Status priority: unopened > in_progress > completed
-      const statusPriority = {unopened: 0, in_progress: 1, completed: 2};
-      const statusDiff = statusPriority[a.status] - statusPriority[b.status];
-
-      if (statusDiff !== 0) {
-        return statusDiff;
-      }
-
-      // If same status, sort by date (newest first)
-      const dateA = new Date(a.payload?.date || 0);
-      const dateB = new Date(b.payload?.date || 0);
-      return dateB - dateA;
-    });
-  },
 };

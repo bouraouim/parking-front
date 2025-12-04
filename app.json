@@ -5,6 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "platforms": ["android", "web"],
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
     "android": {
       "package": "com.parkingmachineassistant",
       "permissions": [
@@ -15,7 +19,8 @@
       ]
     },
     "plugins": [
-      "expo-notifications"
+      "expo-notifications",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

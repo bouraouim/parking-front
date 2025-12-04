@@ -9,8 +9,11 @@ import {
   Alert,
   PermissionsAndroid,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import {useAuth} from '../context/AuthContext';
+import {useLanguage} from '../context/LanguageContext';
+import {getTranslation, formatTranslation} from '../i18n/translations';
 import apiService from '../services/api';
 import {storageService} from '../services/storage';
 import notificationService from '../services/notification';
@@ -19,9 +22,18 @@ const MissionListScreen = ({navigation}) => {
   const [missions, setMissions] = useState([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasNotificationPermission, setHasNotificationPermission] =
     useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMorePages, setHasMorePages] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
   const {logout} = useAuth();
+  const {language, changeLanguage} = useLanguage();
+  
+  const t = (key, params) => {
+    return params ? formatTranslation(language, key, params) : getTranslation(language, key);
+  };
 
   useEffect(() => {
     loadMissions();
@@ -56,12 +68,36 @@ const MissionListScreen = ({navigation}) => {
     }
   };
 
-  const loadMissions = async () => {
+  const loadMissions = async (page = 1, append = false) => {
     try {
-      // First load from local storage
-      const localMissions = await storageService.getMissions();
-      const sorted = storageService.sortMissions(localMissions);
-      setMissions(sorted);
+      if (!append) {
+        // First load from local storage for quick display
+        const localMissions = await storageService.getMissions();
+        if (localMissions.length > 0) {
+          setMissions(localMissions);
+        }
+      }
+
+      // Fetch data from API with pagination
+      const result = await apiService.getAllMissions(page, 10);
+      console.log('Fetched missions:', result);
+      if (result.success) {
+        const newMissions = result.data;
+        const pagination = result.pagination;
+        if (append) {
+          // Append new missions to existing list
+          setMissions(prev => [...prev, ...newMissions]);
+        } else {
+          // Replace missions and save to local storage
+          await storageService.saveMissions(newMissions);
+          setMissions(newMissions);
+        }
+
+        // Update pagination state
+        setCurrentPage(pagination.page);
+        setHasMorePages(pagination.hasNextPage);
+        setTotalPages(pagination.totalPages);
+      }
     } catch (error) {
       console.error('Failed to load missions:', error);
     } finally {
@@ -71,17 +107,26 @@ const MissionListScreen = ({navigation}) => {
 
   const fetchMissions = async () => {
     setIsRefreshing(true);
+    setCurrentPage(1);
+    setHasMorePages(true);
 
     try {
-      const result = await apiService.getAllMissions();
+      const result = await apiService.getAllMissions(1, 10);
 
       if (result.success) {
-        // Save to local storage
-        await storageService.saveMissions(result.data);
+        const newMissions = result.data;
+        const pagination = result.pagination;
 
-        // Update state with sorted missions
-        const sorted = storageService.sortMissions(result.data);
-        setMissions(sorted);
+        // Replace all missions in storage with fresh data
+        await storageService.saveMissions(newMissions);
+
+        // Update state with missions from API (already sorted by backend)
+        setMissions(newMissions);
+
+        // Update pagination state
+        setCurrentPage(pagination.page);
+        setHasMorePages(pagination.hasNextPage);
+        setTotalPages(pagination.totalPages);
       } else {
         Alert.alert('Error', result.error || 'Failed to fetch missions');
       }
@@ -92,15 +137,29 @@ const MissionListScreen = ({navigation}) => {
     }
   };
 
+  const loadMoreMissions = async () => {
+    console.log('Load more missions triggered', isLoadingMore, hasMorePages);
+    if (isLoadingMore || !hasMorePages) return;
+
+    setIsLoadingMore(true);
+    try {
+      await loadMissions(currentPage + 1, true);
+    } catch (error) {
+      console.error('Failed to load more missions:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
   const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      {text: 'Cancel', style: 'cancel'},
+    Alert.alert(t('logout'), t('logoutConfirm'), [
+      {text: t('cancel'), style: 'cancel'},
       {
-        text: 'Logout',
+        text: t('logout'),
         style: 'destructive',
         onPress: async () => {
           await logout();
-          navigation.replace('Login');
+          // Don't navigate - let AuthContext handle the navigation automatically
         },
       },
     ]);
@@ -122,11 +181,11 @@ const MissionListScreen = ({navigation}) => {
   const getStatusText = status => {
     switch (status) {
       case 'unopened':
-        return 'New';
+        return t('statusNew');
       case 'in_progress':
-        return 'In Progress';
+        return t('statusInProgress');
       case 'completed':
-        return 'Completed';
+        return t('statusCompleted');
       default:
         return status;
     }
@@ -146,7 +205,7 @@ const MissionListScreen = ({navigation}) => {
           navigation.navigate('MissionDetails', {missionId: item.missionId})
         }>
         <View style={styles.missionHeader}>
-          <Text style={styles.missionTitle}>{payload.machineName || 'N/A'}</Text>
+          <Text style={styles.missionTitle}>{payload.machineName || t('na')}</Text>
           <View
             style={[
               styles.statusBadge,
@@ -157,8 +216,8 @@ const MissionListScreen = ({navigation}) => {
         </View>
 
         <View style={styles.missionDetails}>
-          <Text style={styles.detailText}>Cashier: {payload.cashier || 'N/A'}</Text>
-          <Text style={styles.detailText}>Date: {payload.date || 'N/A'}</Text>
+          <Text style={styles.detailText}>{t('cashier')}: {payload.cashier || t('na')}</Text>
+          <Text style={styles.detailText}>{t('date')}: {payload.date || t('na')}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -167,7 +226,7 @@ const MissionListScreen = ({navigation}) => {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <Text>Loading missions...</Text>
+        <Text>{t('loadingMissions')}</Text>
       </View>
     );
   }
@@ -175,9 +234,14 @@ const MissionListScreen = ({navigation}) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Missions</Text>
+        <TouchableOpacity 
+          onPress={() => changeLanguage(language === 'en' ? 'fr' : 'en')}
+          style={styles.languageButton}>
+          <Text style={styles.languageText}>{language === 'en' ? 'FR' : 'EN'}</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('missions')}</Text>
         <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('logout')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -186,9 +250,9 @@ const MissionListScreen = ({navigation}) => {
           style={styles.permissionBanner}
           onPress={requestNotificationPermissions}>
           <Text style={styles.permissionText}>
-            ⚠️ Enable notifications to receive mission updates
+            {t('notificationPermission')}
           </Text>
-          <Text style={styles.permissionAction}>Tap to enable</Text>
+          <Text style={styles.permissionAction}>{t('tapToEnable')}</Text>
         </TouchableOpacity>
       )}
 
@@ -204,10 +268,27 @@ const MissionListScreen = ({navigation}) => {
             colors={['#007AFF']}
           />
         }
+        onEndReached={loadMoreMissions}
+        onEndReachedThreshold={0.7}
+        ListFooterComponent={
+          isLoadingMore ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color="#007AFF" />
+              <Text style={styles.loadingMoreText}>{t('loadingMore')}</Text>
+            </View>
+          ) : !hasMorePages && missions.length > 0 ? (
+            <View style={styles.endOfList}>
+              <Text style={styles.endOfListText}>{t('allMissionsLoaded')}</Text>
+              <Text style={styles.endOfListSubtext}>
+                {t('pageOf', {current: currentPage, total: totalPages})}
+              </Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No missions yet</Text>
-            <Text style={styles.emptySubtext}>Pull down to refresh</Text>
+            <Text style={styles.emptyText}>{t('noMissions')}</Text>
+            <Text style={styles.emptySubtext}>{t('pullToRefresh')}</Text>
           </View>
         }
       />
@@ -237,6 +318,18 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  languageButton: {
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 6,
+    minWidth: 40,
+    alignItems: 'center',
+  },
+  languageText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   logoutButton: {
     padding: 8,
@@ -328,6 +421,38 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#ccc',
+  },
+  loadingMore: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    gap: 10,
+  },
+  loadingMoreText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 10,
+  },
+  endOfList: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f0f9ff',
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  endOfListText: {
+    fontSize: 16,
+    color: '#1e40af',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  endOfListSubtext: {
+    fontSize: 13,
+    color: '#3b82f6',
   },
 });
 

@@ -9,9 +9,13 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Brightness from 'expo-brightness';
+import {useLanguage} from '../context/LanguageContext';
+import {getTranslation} from '../i18n/translations';
 import apiService from '../services/api';
 import {storageService} from '../services/storage';
 
@@ -21,6 +25,7 @@ const MissionDetailsScreen = ({route, navigation}) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [comment, setComment] = useState('');
   const [tasks, setTasks] = useState({
     collectNotes: false,
     collectCoins: false,
@@ -28,6 +33,9 @@ const MissionDetailsScreen = ({route, navigation}) => {
     refillCoins: false,
     maintenance: [],
   });
+  const {language} = useLanguage();
+  
+  const t = (key) => getTranslation(language, key);
 
   const originalBrightness = useRef(0);
 
@@ -38,10 +46,15 @@ const MissionDetailsScreen = ({route, navigation}) => {
   useEffect(() => {
     // Initialize maintenance tasks checklist
     if (mission?.payload?.maintenance) {
-      const maintenanceTasks = mission.payload.maintenance.map(task => ({
-        task: typeof task === 'string' ? task : task.task,
-        completed: typeof task === 'object' ? task.completed : false,
-      }));
+      const maintenanceTasks = mission.payload.maintenance.map(task => {
+        // task.task is an object with {en: "...", fr: "..."}
+        const taskText = task.task[language] || task.task.en || task.task.fr || '';
+        
+        return {
+          task: taskText,
+          completed: task.completed || false,
+        };
+      });
       setTasks(prev => ({...prev, maintenance: maintenanceTasks}));
     }
 
@@ -55,7 +68,7 @@ const MissionDetailsScreen = ({route, navigation}) => {
         refillCoins: mission.payload.refill?.coins?.completed || false,
       }));
     }
-  }, [mission]);
+  }, [mission, language]);
 
   const loadMission = async () => {
     try {
@@ -80,18 +93,20 @@ const MissionDetailsScreen = ({route, navigation}) => {
 
       if (result.success) {
         setMission(result.data);
+        // Initialize comment from mission data
+        setComment(result.data.comment || '');
         // Update local storage
         await storageService.updateMission(missionId, result.data);
       } else if (localMission) {
         // Use local data if API fails
         setMission(localMission);
       } else {
-        Alert.alert('Error', 'Mission not found');
+        Alert.alert(t('error'), t('missionNotFound'));
         navigation.goBack();
       }
     } catch (error) {
       console.error('Failed to load mission:', error);
-      Alert.alert('Error', 'Failed to load mission details');
+      Alert.alert(t('error'), t('failedToLoadMission'));
     } finally {
       setIsLoading(false);
     }
@@ -99,19 +114,19 @@ const MissionDetailsScreen = ({route, navigation}) => {
 
   const handleSubmit = async () => {
     Alert.alert(
-      'Submit Mission',
-      'Are you sure you want to submit this mission?',
+      t('submitMission'),
+      t('submitMissionConfirm'),
       [
-        {text: 'Cancel', style: 'cancel'},
+        {text: t('cancel'), style: 'cancel'},
         {
-          text: 'Submit',
+          text: t('submit'),
           onPress: async () => {
             setIsSubmitting(true);
 
             try {
               // Format the update data according to the new structure
               const updateData = {
-                status: 'completed',
+                comment: comment.trim(),
                 collect: {
                   notes: { completed: tasks.collectNotes },
                   coins: { completed: tasks.collectCoins },
@@ -138,18 +153,18 @@ const MissionDetailsScreen = ({route, navigation}) => {
                   completedAt: new Date().toISOString(),
                 });
 
-                Alert.alert('Success', 'Mission completed successfully', [
+                Alert.alert(t('success'), t('missionSubmittedSuccess'), [
                   {
-                    text: 'OK',
+                    text: t('ok'),
                     onPress: () => navigation.goBack(),
                   },
                 ]);
               } else {
-                Alert.alert('Error', result.error || 'Failed to submit mission');
+                Alert.alert(t('error'), result.error || t('failedToSubmit'));
                 // Keep as in_progress locally
               }
             } catch (error) {
-              Alert.alert('Error', 'An error occurred while submitting');
+              Alert.alert(t('error'), t('errorSubmitting'));
             } finally {
               setIsSubmitting(false);
             }
@@ -190,7 +205,7 @@ const MissionDetailsScreen = ({route, navigation}) => {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading mission...</Text>
+        <Text style={styles.loadingText}>{t('loading')}</Text>
       </View>
     );
   }
@@ -198,7 +213,7 @@ const MissionDetailsScreen = ({route, navigation}) => {
   if (!mission) {
     return (
       <View style={styles.centerContainer}>
-        <Text>Mission not found</Text>
+        <Text>{t('missionNotFound')}</Text>
       </View>
     );
   }
@@ -209,44 +224,56 @@ const MissionDetailsScreen = ({route, navigation}) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
+          <Text style={styles.backButton}>← {t('back')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mission Details</Text>
+        <Text style={styles.headerTitle}>{t('missionDetails')}</Text>
         <View style={{width: 50}} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <KeyboardAvoidingView 
+        behavior="height"
+        style={{flex: 1}}>
+        <ScrollView style={styles.content}>
         {/* Mission Info */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mission Information</Text>
+          <Text style={styles.sectionTitle}>{t('missionInformation')}</Text>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Machine:</Text>
-            <Text style={styles.infoValue}>{payload.machineName || 'N/A'}</Text>
+            <Text style={styles.infoLabel}>{t('machine')}:</Text>
+            <Text style={styles.infoValue}>{payload.machineName || t('na')}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Cashier:</Text>
-            <Text style={styles.infoValue}>{payload.cashier || 'N/A'}</Text>
+            <Text style={styles.infoLabel}>{t('cashier')}:</Text>
+            <Text style={styles.infoValue}>{payload.cashier || t('na')}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Date:</Text>
-            <Text style={styles.infoValue}>{payload.date || 'N/A'}</Text>
+            <Text style={styles.infoLabel}>{t('date')}:</Text>
+            <Text style={styles.infoValue}>{payload.date || t('na')}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Status:</Text>
+            <Text style={styles.infoLabel}>{t('status')}:</Text>
             <Text
               style={[
                 styles.infoValue,
                 {color: mission.status === 'completed' ? '#51CF66' : '#FFA500'},
               ]}>
-              {mission.status === 'completed' ? 'Completed' : 'In Progress'}
+              {mission.status === 'completed' ? t('statusCompleted') : t('statusInProgress')}
             </Text>
           </View>
         </View>
 
+        {/* QR Code Button */}
+        {payload.qrCode && (
+          <TouchableOpacity
+            style={styles.qrButton}
+            onPress={handleShowQR}>
+            <Text style={styles.qrButtonText}>{t('showQRCode')}</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Collection Tasks */}
         {payload.collect && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Collection</Text>
+            <Text style={styles.sectionTitle}>{t('collection')}</Text>
             
             {/* Collect Notes */}
             {payload.collect.notes && (
@@ -257,9 +284,9 @@ const MissionDetailsScreen = ({route, navigation}) => {
                   {tasks.collectNotes && <View style={styles.checkboxChecked} />}
                 </View>
                 <View style={styles.taskContent}>
-                  <Text style={styles.taskText}>Collect Notes</Text>
+                  <Text style={styles.taskText}>{t('collectNotes')}</Text>
                   <Text style={styles.taskDetail}>
-                    Amount: ${payload.collect.notes.amount || 0}
+                    {t('amount')}: {payload.collect.notes.amount || 0} TND
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -274,9 +301,9 @@ const MissionDetailsScreen = ({route, navigation}) => {
                   {tasks.collectCoins && <View style={styles.checkboxChecked} />}
                 </View>
                 <View style={styles.taskContent}>
-                  <Text style={styles.taskText}>Collect Coins</Text>
+                  <Text style={styles.taskText}>{t('collectCoins')}</Text>
                   <Text style={styles.taskDetail}>
-                    Amount: ${payload.collect.coins.amount || 0}
+                    {t('amount')}: {payload.collect.coins.amount || 0} TND
                   </Text>
                 </View>
               </TouchableOpacity>
@@ -287,7 +314,7 @@ const MissionDetailsScreen = ({route, navigation}) => {
         {/* Refill Tasks */}
         {payload.refill && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Refill</Text>
+            <Text style={styles.sectionTitle}>{t('refill')}</Text>
             
             {/* Refill Coins */}
             {payload.refill.coins && (
@@ -298,15 +325,15 @@ const MissionDetailsScreen = ({route, navigation}) => {
                   {tasks.refillCoins && <View style={styles.checkboxChecked} />}
                 </View>
                 <View style={styles.taskContent}>
-                  <Text style={styles.taskText}>Refill Coins</Text>
+                  <Text style={styles.taskText}>{t('refillCoins')}</Text>
                   <Text style={styles.taskDetail}>
-                    Amount: ${payload.refill.coins.amount || 0}
+                    {t('amount')}: {payload.refill.coins.amount || 0} TND
                   </Text>
                   {payload.refill.coins.coinTypes &&
                     Object.entries(payload.refill.coins.coinTypes).map(
                       ([type, amount]) => (
                         <Text key={type} style={styles.taskSubDetail}>
-                          • ${type}: {amount} coins
+                          • {type} TND: {amount} {t('coins')}
                         </Text>
                       ),
                     )}
@@ -323,15 +350,15 @@ const MissionDetailsScreen = ({route, navigation}) => {
                   {tasks.refillNotes && <View style={styles.checkboxChecked} />}
                 </View>
                 <View style={styles.taskContent}>
-                  <Text style={styles.taskText}>Refill Notes</Text>
+                  <Text style={styles.taskText}>{t('refillNotes')}</Text>
                   <Text style={styles.taskDetail}>
-                    Amount: ${payload.refill.notes.amount || 0}
+                    {t('amount')}: {payload.refill.notes.amount || 0} TND
                   </Text>
                   {payload.refill.notes.noteTypes &&
                     Object.entries(payload.refill.notes.noteTypes).map(
                       ([type, amount]) => (
                         <Text key={type} style={styles.taskSubDetail}>
-                          • ${type}: {amount} notes
+                          • {type} TND: {amount} {t('notes')}
                         </Text>
                       ),
                     )}
@@ -344,7 +371,7 @@ const MissionDetailsScreen = ({route, navigation}) => {
         {/* Maintenance Tasks */}
         {payload.maintenance && payload.maintenance.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Maintenance</Text>
+            <Text style={styles.sectionTitle}>{t('maintenance')}</Text>
             {tasks.maintenance.map((task, index) => (
               <TouchableOpacity
                 key={index}
@@ -368,47 +395,53 @@ const MissionDetailsScreen = ({route, navigation}) => {
           </View>
         )}
 
-        {/* QR Code Button */}
-        {payload.qrCode && (
-          <TouchableOpacity
-            style={styles.qrButton}
-            onPress={handleShowQR}>
-            <Text style={styles.qrButtonText}>Show QR Code</Text>
-          </TouchableOpacity>
-        )}
+        
 
-        {/* Submit Button */}
-        <TouchableOpacity
-          style={[styles.submitButton, isSubmitting && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={isSubmitting}>
-          {isSubmitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>
-              {mission.status === 'completed' ? 'Update Mission' : 'Submit Mission'}
-            </Text>
-          )}
-        </TouchableOpacity>
+        {/* Comment Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('comment')}</Text>
+          <TextInput
+            style={styles.commentInput}
+            placeholder={t('commentPlaceholder')}
+            value={comment}
+            onChangeText={setComment}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
+
+        {/* Submit Button*/}
+          <TouchableOpacity
+            style={[styles.submitButton, isSubmitting && styles.buttonDisabled]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}>
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>{t('submitMission')}</Text>
+            )}
+          </TouchableOpacity>
 
         {mission.status === 'completed' && (
           <View style={styles.completedBanner}>
-            <Text style={styles.completedText}>✓ Mission Completed</Text>
+            <Text style={styles.completedText}>{t('missionCompleted')}</Text>
           </View>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* QR Code Modal */}
       <Modal visible={showQR} transparent animationType="fade">
         <View style={styles.qrModal}>
           <View style={styles.qrContainer}>
-            <Text style={styles.qrTitle}>Mission QR Code</Text>
+            <Text style={styles.qrTitle}>{t('missionQRCode')}</Text>
             <View style={styles.qrCodeWrapper}>
-              <QRCode value={payload.qrCode || 'N/A'} size={250} />
+              <QRCode value={payload.qrCode || t('na')} size={250} />
             </View>
             <Text style={styles.qrValue}>{payload.qrCode}</Text>
             <TouchableOpacity style={styles.closeButton} onPress={handleCloseQR}>
-              <Text style={styles.closeButtonText}>Close</Text>
+              <Text style={styles.closeButtonText}>{t('close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -525,6 +558,16 @@ const styles = StyleSheet.create({
     color: '#999',
     marginLeft: 12,
     marginTop: 2,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 14,
+    color: '#333',
+    minHeight: 100,
+    backgroundColor: '#fff',
   },
   qrButton: {
     backgroundColor: '#007AFF',

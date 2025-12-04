@@ -11,24 +11,29 @@ import {
   Platform,
 } from 'react-native';
 import {useAuth} from '../context/AuthContext';
+import {useLanguage} from '../context/LanguageContext';
+import {getTranslation} from '../i18n/translations';
 import apiService from '../services/api';
 
 const ServerUrlScreen = ({navigation}) => {
   const [url, setUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const {setServer} = useAuth();
+  const {language} = useLanguage();
+  
+  const t = (key) => getTranslation(language, key);
 
   const handleSubmit = async () => {
     if (!url.trim()) {
-      Alert.alert('Error', 'Please enter a server URL');
+      Alert.alert(t('error'), t('serverUrlRequired'));
       return;
     }
 
     // Basic URL validation
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
       Alert.alert(
-        'Error',
-        'URL must start with http:// or https://\nExample: http://192.168.1.100:3000',
+        t('error'),
+        t('invalidServerUrl'),
       );
       return;
     }
@@ -43,12 +48,12 @@ const ServerUrlScreen = ({navigation}) => {
         navigation.replace('Login');
       } else {
         Alert.alert(
-          'Connection Failed',
-          'Unable to reach the server. Please check the URL and try again.',
+          t('error'),
+          t('invalidServerUrl'),
         );
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to validate server URL');
+      Alert.alert(t('error'), t('failedToFetch'));
     } finally {
       setIsLoading(false);
     }
@@ -60,13 +65,13 @@ const ServerUrlScreen = ({navigation}) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={styles.content}>
         <Text style={styles.title}>Parking Machine Assistant</Text>
-        <Text style={styles.subtitle}>Configure Server</Text>
+        <Text style={styles.subtitle}>{t('serverUrl')}</Text>
 
         <View style={styles.form}>
-          <Text style={styles.label}>Server URL</Text>
+          <Text style={styles.label}>{t('serverUrl')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="http://192.168.1.100:3000"
+            placeholder={t('serverUrlPlaceholder')}
             value={url}
             onChangeText={setUrl}
             autoCapitalize="none"
@@ -76,8 +81,9 @@ const ServerUrlScreen = ({navigation}) => {
           />
 
           <Text style={styles.hint}>
-            Enter the backend server URL. Make sure the server is running and
-            accessible.
+            {language === 'fr' 
+              ? 'Entrez l\'URL du serveur backend. Assurez-vous que le serveur est en cours d\'exécution et accessible.'
+              : 'Enter the backend server URL. Make sure the server is running and accessible.'}
           </Text>
 
           <TouchableOpacity
@@ -87,7 +93,7 @@ const ServerUrlScreen = ({navigation}) => {
             {isLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Continue</Text>
+              <Text style={styles.buttonText}>{t('connect')}</Text>
             )}
           </TouchableOpacity>
         </View>

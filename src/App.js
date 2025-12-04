@@ -1,8 +1,10 @@
 import React from 'react';
-import {SafeAreaView, StyleSheet, StatusBar, Platform} from 'react-native';
+import {StyleSheet, StatusBar} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import {AuthProvider, useAuth} from './context/AuthContext';
+import {LanguageProvider} from './context/LanguageContext';
 import ServerUrlScreen from './screens/ServerUrlScreen';
 import LoginScreen from './screens/LoginScreen';
 import MissionListScreen from './screens/MissionListScreen';
@@ -39,9 +41,11 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar backgroundColor="#007AFF" barStyle="light-content" />
-      <AuthProvider>
-        <Navigation />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <Navigation />
+        </AuthProvider>
+      </LanguageProvider>
     </SafeAreaView>
   );
 }

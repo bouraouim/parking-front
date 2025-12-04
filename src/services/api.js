@@ -164,7 +164,7 @@ class ApiService {
   }
 
   // Missions
-  async getAllMissions() {
+  async getAllMissions(page = 1, limit = 10) {
     try {
       const user = await this.getUserData();
       if (!user || !user.username) {
@@ -174,9 +174,15 @@ class ApiService {
       const response = await this.client.get('/api/missions', {
         params: {
           username: user.username,
+          page,
+          limit,
         },
       });
-      return {success: true, data: response.data};
+      return {
+        success: true,
+        data: response.data.missions,
+        pagination: response.data.pagination,
+      };
     } catch (error) {
       return {
         success: false,
